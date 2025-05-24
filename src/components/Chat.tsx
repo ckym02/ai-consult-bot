@@ -8,6 +8,24 @@ export default function Chat() {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [currentAIMessage, setCurrentAIMessage] = useState('');
+
+  const typeWriterEffect = (text: string, onDone: () => void) => {
+    let i = 0;
+    const speed = 30;
+
+    const type = () => {
+      setCurrentAIMessage(text.slice(0, i + 1));
+      i++;
+      if (i < text.length) {
+        setTimeout(type, speed);
+      } else {
+        onDone();
+      }
+    };
+
+    type();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +46,11 @@ export default function Chat() {
         ],
       });
 
-      setMessages((prev) => [...prev, `AI: ${response.text}`]);
+      const reply = response.text ?? '';
+      typeWriterEffect(reply, () => {
+        setMessages((prev) => [...prev, `AI: ${reply}`]);
+        setCurrentAIMessage('');
+      });
     } catch (error) {
       console.error('Gemini API エラー:', error);
     } finally {
@@ -40,11 +62,10 @@ export default function Chat() {
     <div className="p-4">
       <div className="h-[400px] overflow-y-auto border p-2 mb-4">
         {messages.map((msg, index) => (
-          <div key={index} className="mb-2">
-            {msg}
-          </div>
+          <div key={index} className="mb-2">{msg}</div>
         ))}
-        {isLoading && <div>AIが考え中...</div>}
+        {currentAIMessage && <div className="mb-2">AI: {currentAIMessage}</div>}
+        {isLoading && !currentAIMessage && <div>AIが考え中...</div>}
       </div>
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
