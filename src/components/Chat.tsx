@@ -1,6 +1,7 @@
-// src/components/Chat.tsx
 import { useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import ChatList from './ChatList';
+import ChatInput from './ChatInput';
 
 const genAI = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
@@ -13,7 +14,6 @@ export default function Chat() {
   const typeWriterEffect = (text: string, onDone: () => void) => {
     let i = 0;
     const speed = 30;
-
     const type = () => {
       setCurrentAIMessage(text.slice(0, i + 1));
       i++;
@@ -23,7 +23,6 @@ export default function Chat() {
         onDone();
       }
     };
-
     type();
   };
 
@@ -60,24 +59,12 @@ export default function Chat() {
 
   return (
     <div className="p-4">
-      <div className="h-[400px] overflow-y-auto border p-2 mb-4">
-        {messages.map((msg, index) => (
-          <div key={index} className="mb-2">{msg}</div>
-        ))}
-        {currentAIMessage && <div className="mb-2">AI: {currentAIMessage}</div>}
-        {isLoading && !currentAIMessage && <div>AIが考え中...</div>}
-      </div>
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          className="border p-2 flex-grow"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="質問してみてください"
-        />
-        <button className="bg-blue-500 text-white px-4 py-2 rounded" type="submit">
-          送信
-        </button>
-      </form>
+      <ChatList
+        messages={messages}
+        currentAIMessage={currentAIMessage}
+        isLoading={isLoading}
+      />
+      <ChatInput input={input} onChange={setInput} onSubmit={handleSubmit} />
     </div>
   );
 }
