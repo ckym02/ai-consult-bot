@@ -1,15 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import ChatList from './ChatList';
 import ChatInput from './ChatInput';
 
 const genAI = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+const STORAGE_KEY = 'chat-history';
 
 export default function Chat() {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentAIMessage, setCurrentAIMessage] = useState('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    console.log(saved);
+    if (saved) {
+      setMessages(JSON.parse(saved));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (messages.length) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    }
+  }, [messages]);
 
   const typeWriterEffect = (text: string, onDone: () => void) => {
     let i = 0;
