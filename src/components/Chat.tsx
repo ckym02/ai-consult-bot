@@ -1,22 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { v4 as uuidv4 } from 'uuid';
 import ChatList from './ChatList';
 import ChatInput from './ChatInput';
 
-const genAI = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 const STORAGE_KEY = 'chat-history';
+const genAI = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+
+export type Message = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+};
 
 export default function Chat() {
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentAIMessage, setCurrentAIMessage] = useState('');
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    console.log(saved);
     if (saved) {
-      setMessages(JSON.parse(saved));
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setMessages(parsed);
+      } catch (e) {
+        console.error('履歴読み込みエラー', e);
+      }
     }
   }, []);
 
@@ -45,7 +56,12 @@ export default function Chat() {
     e.preventDefault();
     if (!input.trim()) return;
 
-    setMessages((prev) => [...prev, `あなた: ${input}`]);
+    const userMessage: Message = {
+      id: uuidv4(),
+      role: 'user',
+      content: input,
+    };
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
@@ -62,14 +78,29 @@ export default function Chat() {
 
       const reply = response.text ?? '';
       typeWriterEffect(reply, () => {
-        setMessages((prev) => [...prev, `AI: ${reply}`]);
+        const aiMessage: Message = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: reply,
+        };
+        setMessages((prev) => [...prev, aiMessage]);
         setCurrentAIMessage('');
       });
-    } catch (error) {
-      console.error('Gemini API エラー:', error);
+    } catch (err) {
+      console.error('Gemini API エラー:', err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleEdit = (id: string, newContent: string) => {
+    setMessages((prev) =>
+      prev.map((msg) => (msg.id === id ? { ...msg, content: newContent } : msg))
+    );
+  };
+
+  const handleDelete = (id: string) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== id));
   };
 
   return (
@@ -78,6 +109,8 @@ export default function Chat() {
         messages={messages}
         currentAIMessage={currentAIMessage}
         isLoading={isLoading}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
       />
       <ChatInput input={input} onChange={setInput} onSubmit={handleSubmit} />
     </div>
