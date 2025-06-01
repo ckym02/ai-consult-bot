@@ -52,6 +52,50 @@ export default function Chat() {
     type();
   };
 
+  const regenerateAIResponse = async (updatedMessages: Message[]) => {
+    const chatHistory = updatedMessages.map((m) => ({
+      role: m.role,
+      parts: [{ text: m.content }],
+    }));
+    setIsLoading(true);
+    try {
+      const response = await genAI.models.generateContent({
+        model: 'gemini-2.0-flash-001',
+        contents: chatHistory,
+      });
+      const reply = response.text ?? '';
+      typeWriterEffect(reply, () => {
+        setMessages([...updatedMessages, {
+          id: uuidv4(),
+          role: 'assistant',
+          content: reply,
+        }]);
+        setCurrentAIMessage('');
+      });
+    } catch (e) {
+      console.error('Gemini再生成エラー', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEdit = (id: string, newContent: string) => {
+    const index = messages.findIndex((m) => m.id === id);
+    if (index === -1) return;
+    const updated = [...messages];
+    // 指定されたindexのメッセージだけcontentを新しいテキストに上書き
+    updated[index] = { ...updated[index], content: newContent };
+    // indexまでの履歴だけを抜き出す
+    const truncated = updated.slice(0, index + 1);
+    setMessages(truncated);
+    // geminiに再送信
+    regenerateAIResponse(truncated);
+  };
+
+  const handleDelete = (id: string) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== id));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -61,29 +105,36 @@ export default function Chat() {
       role: 'user',
       content: input,
     };
-    setMessages((prev) => [...prev, userMessage]);
+
+    setMessages((prev) => {
+      const updatedMessages = [...prev, userMessage];
+
+      // Gemini API 呼び出し用に非同期関数内でも参照できるように
+      callGeminiWithMessages(updatedMessages);
+
+      return updatedMessages;
+    });
     setInput('');
     setIsLoading(true);
+  };
 
+  const callGeminiWithMessages = async (messagesForGemini: Message[]) => {
     try {
       const response = await genAI.models.generateContent({
         model: 'gemini-2.0-flash-001',
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: input }],
-          },
-        ],
+        contents: messagesForGemini.map((m) => ({
+          role: m.role,
+          parts: [{ text: m.content }],
+        })),
       });
 
       const reply = response.text ?? '';
       typeWriterEffect(reply, () => {
-        const aiMessage: Message = {
+        setMessages((prev) => [...prev, {
           id: uuidv4(),
           role: 'assistant',
           content: reply,
-        };
-        setMessages((prev) => [...prev, aiMessage]);
+        }]);
         setCurrentAIMessage('');
       });
     } catch (err) {
@@ -91,16 +142,6 @@ export default function Chat() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleEdit = (id: string, newContent: string) => {
-    setMessages((prev) =>
-      prev.map((msg) => (msg.id === id ? { ...msg, content: newContent } : msg))
-    );
-  };
-
-  const handleDelete = (id: string) => {
-    setMessages((prev) => prev.filter((msg) => msg.id !== id));
   };
 
   return (
